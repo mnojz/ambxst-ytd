@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.log
+
+# Editor and Qt tooling scratch files
+.qmlls.ini
+*.qmlls.ini
+*.orig
+*.rej
+*.bak
+*~
+.DS_Store
+.idea/
+.vscode/
