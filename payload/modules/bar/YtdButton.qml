@@ -535,7 +535,11 @@ Item {
                     clip: true
 
                     ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+                    // No scrollbar gutter. The history list is long, but the
+                    // overflow affordance is not worth a permanent ~10px strip
+                    // on a panel this narrow; the wheel and touchpad still
+                    // scroll the view.
+                    ScrollBar.vertical.policy: ScrollBar.AlwaysOff
 
                     ColumnLayout {
                         id: card
@@ -930,7 +934,11 @@ Item {
         // value to change the popup viewport height.
         readonly property int availableHeight: Math.max(240, screenHeight - 48)
         readonly property int maximumContentHeight: 350
-        contentWidth: Math.max(390, Math.min(430, screenWidth - 72))
+        // The format row is fixed width: FormatSelector sizes itself from its
+        // chips and the scope toggle adds 44px, so ~350px of content is the
+        // point below which the selector row starts to clip. 404 keeps roughly
+        // 30px of breathing room once the padding is taken off.
+        contentWidth: Math.max(372, Math.min(404, screenWidth - 72))
         contentHeight: Math.min(availableHeight, maximumContentHeight)
 
         function open() {
