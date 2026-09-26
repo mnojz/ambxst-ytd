@@ -39,12 +39,29 @@ Ambxst state.
   and the popup switches it to `Exclusive` while open, matching how the shell's
   own input surfaces work (`UnifiedShellPanel`, `ContextMenu`).
 
-  Two consequences when editing the popup. It spans the whole screen and
-  positions its content by hand, because `PanelWindow` has no `x`/`y` and no
-  `anchor.item`; `popupX`/`popupY` map the bar button to screen coordinates.
-  And it does not use a `default property` alias for its content, because
-  `PanelWindow` is a C++ type whose default property cannot be redefined, so
-  the `ScrollView` is placed with explicit coordinates instead.
+  Three things about this window are load-bearing. Do not undo them.
+
+  - **It is full-screen, so it sits on top of the bar.** `PanelWindow` has no
+    `x`/`y` and no `anchor.item`, so the window spans the screen and a child
+    carries the real position, the same shape `ContextMenu` uses. Because the
+    window covers the bar, it must not carry a `mask: Region`; the input region
+    is left unrestricted and a full-screen `MouseArea` behind the popup closes
+    it on any click. That is what makes the bar button usable to dismiss the
+    popup even though the popup is drawn over it. A `FocusGrab` must not be
+    used here either: it is Quickshell's Hyprland focus grab, and it
+    redirected input away from the button.
+  - **Position is computed in `reposition()`, not in a binding.** `mapToItem()`
+    is a function call, so a binding over it is evaluated once at load — while
+    the bar is still at its pre-layout position — and never re-evaluates. That
+    stale value is what opened the popup in the wrong corner. `open()` and
+    `onVisibleChanged` both call `reposition()`.
+  - **The content must stay inside the styled `background`.** The `ScrollView`
+    is a child of it and anchored to it. When the `ScrollView` was a sibling
+    placed with absolute window coordinates it did not follow the background's
+    fade, so the two visibly tore down one after another. For the same reason
+    the popup is now shown and hidden outright instead of fading: a fade on a
+    full-screen layer surface repaints the whole screen every frame and reads
+    as lag.
 - `payload/modules/services/YtdService.qml`: process lifecycle, bounded request
   queue, cancellation, history restore/persistence, clipboard, and event parsing.
 - `payload/modules/services/YtdHistory.js`: pure history sanitizing/dedup/cap.
