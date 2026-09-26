@@ -29,8 +29,14 @@ Item {
     // sections are laid out together instead of nesting a second scroller.
     readonly property bool historyVisible: YtdService.history.length > 0
     // These roles are resolved by the shell theme rather than fixed RGB values.
-    readonly property color activeContentColor: Styling.srItem("primary")
-    readonly property color barContentColor: barActive ? activeContentColor : Styling.srItem("bg")
+    // Active: the deepest background role, because the primary button's own "on"
+    // role (overPrimary) is a lighter blue-grey and does not read as dark
+    // enough against the light surface.
+    // Idle: the primary accent, so the glyph matches the other themed icons
+    // instead of the near-white overBackground role.
+    readonly property color activeContentColor: Colors.background
+    readonly property color idleContentColor: Colors.primary
+    readonly property color barContentColor: barActive ? activeContentColor : idleContentColor
     readonly property color barTrackColor: Colors.background
     readonly property color barProgressColor: Colors.overBackground
 
@@ -129,8 +135,17 @@ Item {
 
     component YtdIcon: Item {
         id: wrapper
-        property real iconSize: 18
+        property real iconSize: 16
+        // Resolved from the shell theme by the caller. The bar button passes the
+        // button's own foreground role so the glyph keeps its contrast when the
+        // surface flips to primary; the popup sites keep the light default.
+        property color tintColor: Colors.overBackground
 
+        // Source artwork stays visible and untinted. Tinted reads it through a
+        // ShaderEffectSource and paints monochrome over it, which replaces the
+        // artwork colour with exactly `tintColor`. Do not pass the Image
+        // straight to a MultiEffect: it needs a texture source and would render
+        // nothing, leaving the raw white SVG showing through.
         Image {
             id: icon
             anchors.centerIn: parent
@@ -142,12 +157,16 @@ Item {
             smooth: true
             visible: true
         }
+
         Tinted {
             anchors.fill: icon
             sourceItem: icon
-            // Keep the custom SVG on the same theme-driven icon path as
-            // Ambxst's normal shell icons, even when tintIcons is disabled.
+            // monochrome keeps the icon's own shading while colourising it in
+            // one flat hue, so the glyph lands on an exact theme role instead
+            // of the palette blend, which cannot target a specific role.
             active: true
+            monochrome: true
+            tintColor: wrapper.tintColor
         }
     }
 
@@ -334,6 +353,7 @@ Item {
             YtdIcon {
                 anchors.fill: parent
                 visible: !YtdService.running
+                tintColor: root.barContentColor
             }
             Text {
                 anchors.centerIn: parent
@@ -448,7 +468,7 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent
-                            radius: parent.radius
+                            radius: parent.radius ?? 0
                             color: "transparent"
                             border.color: Colors.red
                             border.width: 1
