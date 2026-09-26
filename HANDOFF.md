@@ -2,10 +2,11 @@
 
 ## Status
 
-- Mod: `community.ambxstytd`
-- Version: `1.3.1`
+- Mod: `mnojz.ambxstytd`
+- Version: `1.4.5`
 - Compatibility: Ambxst `>=1.3.0 <1.4.0`
-- Tested against Ambxst `1.3.8`, base commit `2a704c438ddc0b94a11f4e4cf32a16220b62141f`
+- Tested against Ambxst `1.3.9`, base commit `3705f278f24a74718fc23772b47044e96701d53a`
+- Requires the `drpezzer.tinted-icons` mod
 - License: MIT
 
 The mod adds a horizontal/vertical bar button and popup for YouTube MP3 and
@@ -90,8 +91,12 @@ The bridge uses `qs list -a -j`, filters actual `shell_id=ambxst` generation
 shells, selects the newest running one, and invokes:
 
 ```bash
-qs ipc --pid <pid> call ytd download <clean-url> <format>
+qs ipc --pid <pid> call ytd download <clean-url> <format> <scope>
 ```
+
+`scope` is `single` or `playlist`. The bridge strips the `list` parameter in
+single scope and rejects playlist-only links there, because they name no single
+video.
 
 Legacy aliases (`audio`, `sd`, `hd`, `fhd`, `qhd`, `uhd`) remain supported.
 Failures print to stderr and use `notify-send` when available.
@@ -101,9 +106,9 @@ Failures print to stderr and use `notify-send` when available.
 New installs are disabled by Ambxst. Refresh explicitly:
 
 ```bash
-ambxst mods remove community.ambxstytd
-ambxst mods install /home/manoj/Projects/ambxst-ytd
-ambxst mods enable community.ambxstytd
+ambxst mods remove mnojz.ambxstytd
+ambxst mods install https://github.com/mnojz/ambxst-ytd
+ambxst mods enable mnojz.ambxstytd
 ambxst reload
 ```
 
@@ -119,12 +124,15 @@ Run:
 /home/manoj/Projects/ambxst-ytd/scripts/validate.sh
 ```
 
-It checks Python/JSON/shell syntax, diff hygiene, 14 Python tests, 3 history
-tests, patch applicability, repository/generated payload equality, a generated
-QuickShell smoke load, and desktop registration. A healthy smoke process is
-stopped by `timeout`, so status 124 is expected.
+It checks Python/JSON/shell syntax, diff hygiene, 24 Python tests, 3 history
+tests, 9 URL tests, patch applicability, repository/generated payload equality, a
+generated QuickShell smoke load, and desktop registration. A healthy smoke
+process is stopped by `timeout`, so status 124 is expected.
 
 Use `AMBXST_SOURCE=/path/to/ambxst` to override the local base checkout.
+
+The `ydl:` browser extension that drives this mod is maintained outside this
+repository and is not validated here.
 
 ## Known caveats
 

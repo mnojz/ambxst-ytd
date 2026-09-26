@@ -20,7 +20,12 @@ Item {
     property bool layerEnabled: true
     property real startRadius: Styling.radius(0)
     property real endRadius: Styling.radius(0)
-    readonly property bool popupOpen: popup.isOpen
+    // The button only shows its active look while the popup is genuinely on
+    // screen. BarPopup can be left with isOpen=true and visible=false, because
+    // close() returns early when the surface is already hidden; keying the
+    // appearance off isOpen alone would then pin the button to the active
+    // styling with no popup visible.
+    readonly property bool popupOpen: popup.isOpen && popup.visible
     readonly property bool barActive: popupOpen || YtdService.running
     readonly property bool activeCardVisible: YtdService.state === "starting"
         || YtdService.state === "downloading" || YtdService.state === "error"
@@ -397,6 +402,17 @@ Item {
         anchorItem: button
         bar: root.bar
         popupPadding: 12
+        // This popup hosts a text field, so its surface has to be
+        // keyboard-interactive. Bar.qml sets the bar itself to
+        // WlrKeyboardFocus.None and a PopupWindow does not inherit keyboard
+        // interactivity, so without this the caret blinks and forceActiveFocus
+        // succeeds, yet the compositor keeps delivering keystrokes to whichever
+        // window it considers focused.
+        //
+        // Bound to the visible surface rather than isOpen: grabbing focus off a
+        // popup that is not on screen feeds the shell's FocusGrab.onCleared
+        // path, which can leave isOpen stranded true.
+        grabFocus: root.popupOpen
         readonly property real screenHeight: root.bar?.screen?.height > 0 ? root.bar.screen.height : 900
         readonly property real screenWidth: root.bar?.screen?.width > 0 ? root.bar.screen.width : 900
         // One page scrolls as a single unit: header, URL field, format
@@ -458,6 +474,9 @@ Item {
                     text: YtdService.url
                     selectByMouse: true
                     activeFocusOnTab: true
+                    // The popup's onIsOpenChanged already calls
+                    // forceActiveFocus(); this binding is kept so the field also
+                    // regains focus if it is lost while the popup stays open.
                     focus: popup.isOpen
                     background: StyledRect {
                         id: urlFieldBackground
