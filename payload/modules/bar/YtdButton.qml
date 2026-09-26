@@ -5,6 +5,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import qs.config
 
 import Quickshell.Widgets
@@ -397,22 +398,150 @@ Item {
         }
     }
 
-    BarPopup {
+    // Keyboard input: this popup is a mod-owned PanelWindow rather than a
+    // BarPopup. BarPopup is a Quickshell PopupWindow, which is not a
+    // WlrLayerShell surface and therefore cannot request keyboard
+    // interactivity: WlrLayershell fails to attach to it, and PopupWindow's
+    // grabFocus only toggles the Qt::Popup flag for click-outside dismissal.
+    // The shell's own input surfaces (UnifiedShellPanel, ContextMenu) are
+    // PanelWindows that switch keyboardFocus to Exclusive while open, which is
+    // what makes their text fields usable. This mirrors that.
+    PanelWindow {
         id: popup
-        anchorItem: button
-        bar: root.bar
-        popupPadding: 12
-        // This popup hosts a text field, so its surface has to be
-        // keyboard-interactive. Bar.qml sets the bar itself to
-        // WlrKeyboardFocus.None and a PopupWindow does not inherit keyboard
-        // interactivity, so without this the caret blinks and forceActiveFocus
-        // succeeds, yet the compositor keeps delivering keystrokes to whichever
-        // window it considers focused.
-        //
-        // Bound to the visible surface rather than isOpen: grabbing focus off a
-        // popup that is not on screen feeds the shell's FocusGrab.onCleared
-        // path, which can leave isOpen stranded true.
-        grabFocus: root.popupOpen
+        property int popupPadding: 12
+        property int shadowMargin: 16
+        property int visualMargin: 8
+
+        // Logical open state, plus the animation values BarPopup exposed.
+        property bool isOpen: false
+        property real popupOpacity: 0
+        property real popupScale: 0.9
+        property bool focusActive: false
+        property bool closeOnFocusLost: true
+
+        readonly property string barPosition: root.bar?.barPosition ?? "top"
+        readonly property bool barAtTop: barPosition === "top"
+        readonly property bool barAtBottom: barPosition === "bottom"
+        readonly property bool barAtLeft: barPosition === "left"
+        readonly property bool barAtRight: barPosition === "right"
+        readonly property bool barVertical: barAtLeft || barAtRight
+
+        // Declared without a value: the content block below assigns these, and
+        // two assignments in the same object scope would be a QML error.
+        property int contentWidth
+        property int contentHeight
+        readonly property int totalWidth: contentWidth + shadowMargin * 2
+        readonly property int totalHeight: contentHeight + shadowMargin * 2
+
+        // PanelWindow has no x/y, so the window itself spans the screen and the
+        // popup is positioned inside it, which is the same shape the shell uses
+        // for ContextMenu: a full-screen transparent layer window whose child
+        // carries the real position.
+        anchors {
+            top: true
+            bottom: true
+            left: true
+            right: true
+        }
+        color: "transparent"
+        visible: false
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.namespace: "ambxst-ytd"
+        WlrLayershell.keyboardFocus: root.popupOpen
+            ? WlrKeyboardFocus.Exclusive
+            : WlrKeyboardFocus.None
+
+        // The window covers the screen, so restrict pointer input to the popup
+        // itself. Without this the transparent surface would swallow every click.
+        mask: Region {
+            item: background
+        }
+
+        // Screen position of the bar button, mapped out of the bar window.
+        readonly property point anchorPos: {
+            const win = button.Window.window;
+            const p = button.mapToItem(null, 0, 0);
+            return {
+                x: (win ? win.x : 0) + p.x,
+                y: (win ? win.y : 0) + p.y
+            };
+        }
+        readonly property real popupX: {
+            if (barVertical) {
+                if (barAtLeft)
+                    return anchorPos.x + button.width + visualMargin;
+                return anchorPos.x - totalWidth - visualMargin;
+            }
+            return anchorPos.x + (button.width - totalWidth) / 2;
+        }
+        readonly property real popupY: {
+            if (barVertical)
+                return anchorPos.y + (button.height - totalHeight) / 2;
+            if (barAtTop)
+                return anchorPos.y + button.height + visualMargin;
+            return anchorPos.y - totalHeight - visualMargin;
+        }
+
+        Behavior on popupOpacity {
+            enabled: Config.animDuration > 0
+            NumberAnimation {
+                duration: Config.animDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+        Behavior on popupScale {
+            enabled: Config.animDuration > 0
+            NumberAnimation {
+                duration: Config.animDuration
+                easing.type: Easing.OutCubic
+            }
+        }
+
+        Item {
+            id: popupContainer
+            x: popup.popupX
+            y: popup.popupY
+            width: popup.totalWidth
+            height: popup.totalHeight
+            opacity: popup.popupOpacity
+            scale: popup.popupScale
+            transformOrigin: {
+                if (popup.barAtTop)
+                    return Item.Top;
+                if (popup.barAtBottom)
+                    return Item.Bottom;
+                if (popup.barAtLeft)
+                    return Item.Left;
+                if (popup.barAtRight)
+                    return Item.Right;
+                return Item.Center;
+            }
+
+            StyledRect {
+                id: background
+                anchors.fill: parent
+                anchors.margins: popup.shadowMargin
+                variant: "popup"
+                enableShadow: true
+                radius: Styling.radius(8)
+            }
+        }
+
+        FocusGrab {
+            active: popup.visible && popup.focusActive
+            windows: [popup]
+            onCleared: {
+                if (popup.closeOnFocusLost && popup.isOpen)
+                    popup.close();
+            }
+        }
+
+        Timer {
+            id: closeTimer
+            interval: Config.animDuration > 0 ? Config.animDuration + 50 : 50
+            onTriggered: popup.visible = false
+        }
         readonly property real screenHeight: root.bar?.screen?.height > 0 ? root.bar.screen.height : 900
         readonly property real screenWidth: root.bar?.screen?.width > 0 ? root.bar.screen.width : 900
         // One page scrolls as a single unit: header, URL field, format
@@ -424,7 +553,14 @@ Item {
         contentHeight: Math.min(availableHeight, maximumContentHeight)
 
         ScrollView {
-            anchors.fill: parent
+            // PanelWindow is a C++ type, so its default property cannot be
+            // redirected (unlike BarPopup's PopupWindow). The content is
+            // therefore placed in window coordinates by hand, matching the
+            // padding the StyledRect above provides.
+            x: popup.popupX + popup.shadowMargin + popup.popupPadding
+            y: popup.popupY + popup.shadowMargin + popup.popupPadding
+            width: popup.contentWidth - popup.popupPadding * 2
+            height: popup.contentHeight - popup.popupPadding * 2
             contentWidth: availableWidth
             contentHeight: card.implicitHeight
             clip: true
@@ -815,6 +951,44 @@ Item {
 
             }
         }
+        function open() {
+            if (visible)
+                return;
+
+            isOpen = true;
+            popupOpacity = 0;
+            popupScale = 0.9;
+            visible = true;
+
+            Qt.callLater(() => {
+                popupOpacity = 1;
+                popupScale = 1;
+                focusActive = true;
+            });
+        }
+
+        function close() {
+            // Always clear the logical flag, even when the surface is already
+            // hidden. Skipping it here would leave the button stuck in its
+            // active state with no popup showing.
+            isOpen = false;
+            focusActive = false;
+
+            if (!visible)
+                return;
+
+            popupOpacity = 0;
+            popupScale = 0.9;
+            closeTimer.restart();
+        }
+
+        function toggle() {
+            if (visible)
+                close();
+            else
+                open();
+        }
+
         onIsOpenChanged: {
             if (isOpen)
                 Qt.callLater(() => urlField.forceActiveFocus())

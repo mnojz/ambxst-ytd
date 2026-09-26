@@ -26,9 +26,25 @@ Ambxst state.
   popup uses a single page-level `ScrollView` inside a fixed 350px viewport, so
   the header, URL field, format selector, active card, and all history cards
   scroll together as one unit. There is no nested history scroller. Change
-  `maximumContentHeight` on the `BarPopup` to adjust the height. The YTD glyph
+  `maximumContentHeight` to adjust the height. The YTD glyph
   uses the shared `Tinted` component, and bar progress colors use semantic style
   roles rather than fixed RGB values.
+
+  The popup is a mod-owned `PanelWindow`, not the shell's `BarPopup`. `BarPopup`
+  is a Quickshell `PopupWindow`, which is not a WlrLayerShell surface and so
+  cannot take keyboard input: `WlrLayershell` fails to attach to it, and
+  `PopupWindow.grabFocus` only toggles the `Qt::Popup` flag for click-outside
+  dismissal, it does not request keyboard focus. The URL field therefore could
+  not receive keystrokes. `PanelWindow` supports `WlrLayershell.keyboardFocus`,
+  and the popup switches it to `Exclusive` while open, matching how the shell's
+  own input surfaces work (`UnifiedShellPanel`, `ContextMenu`).
+
+  Two consequences when editing the popup. It spans the whole screen and
+  positions its content by hand, because `PanelWindow` has no `x`/`y` and no
+  `anchor.item`; `popupX`/`popupY` map the bar button to screen coordinates.
+  And it does not use a `default property` alias for its content, because
+  `PanelWindow` is a C++ type whose default property cannot be redefined, so
+  the `ScrollView` is placed with explicit coordinates instead.
 - `payload/modules/services/YtdService.qml`: process lifecycle, bounded request
   queue, cancellation, history restore/persistence, clipboard, and event parsing.
 - `payload/modules/services/YtdHistory.js`: pure history sanitizing/dedup/cap.
