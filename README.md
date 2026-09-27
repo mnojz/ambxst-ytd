@@ -7,7 +7,7 @@ request queue, persistent history, and browser `ytd:` links.
 ## Requirements
 
 - Ambxst `>=1.3.0 <1.4.0`
-- The [`drpezzer.tinted-icons`](https://github.com/drpezzer/tinted-icons) mod
+- The [`drpezzer.tinted-icons`](https://github.com/drpezzer/ambxst-mods) mod
 - Python 3 with the `yt_dlp` module
 - `yt-dlp`, `ffmpeg`, `wl-paste`, `xdg-open`, and QuickShell (`qs`)
 - A Wayland Ambxst session
