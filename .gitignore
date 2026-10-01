@@ -16,3 +16,6 @@ htmlcov/
 .DS_Store
 .idea/
 .vscode/
+
+# Local session notes, not part of the published mod
+HANDOFF.md

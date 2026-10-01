@@ -7,7 +7,6 @@ request queue, persistent history, and browser `ytd:` links.
 ## Requirements
 
 - Ambxst `>=1.3.0 <1.4.0`
-- The [`drpezzer.tinted-icons`](https://github.com/drpezzer/ambxst-mods) mod
 - Python 3 with the `yt_dlp` module
 - `yt-dlp`, `ffmpeg`, `wl-paste`, `xdg-open`, and QuickShell (`qs`)
 - A Wayland Ambxst session
@@ -15,13 +14,18 @@ request queue, persistent history, and browser `ytd:` links.
 The mod manifest is the authoritative dependency declaration. Ambxst refuses
 composition when a declared command is unavailable.
 
-### Why `tinted-icons` is required
+### No mod dependencies
 
-The bar glyph is colourised through the shell's shared `Tinted` component using
-its `monochrome` mode, so the icon matches the active and inactive theme
-colours. `monochrome` is contributed by `tinted-icons`; without it `Tinted`
-renders nothing and the raw white artwork shows through. The manifest declares
-it as a hard `dependencies` entry so Ambxst installs and enables it for you.
+The mod depends on no other mod and works on a stock Ambxst tree.
+
+The bar glyph used to be colourised through the shell's shared `Tinted`
+component in its `monochrome` mode, which is not part of Ambxst itself: it only
+existed in `drpezzer.tinted-icons`. That mod has been archived into
+`drpezzer.roadie`, which declares a conflict with the old id, so it can no
+longer be installed alongside this one. Since `monochrome` mode is a colourising
+pass over the icon's own luminance, the mod now carries that pass itself in
+`YtdIcon` and applies it to this one glyph. Icons elsewhere on the shell are
+untouched, and enabling or disabling this mod no longer depends on anyone else.
 
 ## Install the mod
 

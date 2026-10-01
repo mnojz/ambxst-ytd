@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
@@ -147,11 +148,9 @@ Item {
         // surface flips to primary; the popup sites keep the light default.
         property color tintColor: Colors.overBackground
 
-        // Source artwork stays visible and untinted. Tinted reads it through a
-        // ShaderEffectSource and paints monochrome over it, which replaces the
-        // artwork colour with exactly `tintColor`. Do not pass the Image
-        // straight to a MultiEffect: it needs a texture source and would render
-        // nothing, leaving the raw white SVG showing through.
+        // The raw SVG is white artwork. It stays visible underneath and the
+        // colourised pass below is drawn exactly on top of it, so the artwork is
+        // both the texture source and the unfiltered fallback.
         Image {
             id: icon
             anchors.centerIn: parent
@@ -164,15 +163,42 @@ Item {
             visible: true
         }
 
-        Tinted {
-            anchors.fill: icon
+        // The monochrome tint is done here rather than through the shell's shared
+        // `Tinted` component. `monochrome` mode is not part of the base Ambxst
+        // tree: it only exists in the `tinted-icons` mod, which its author
+        // archived into `roadie`, and `roadie` cannot be installed next to this
+        // mod. What that mode actually does is two properties on a
+        // colorisation pass, so the mod carries its own copy and stays
+        // independent. It is scoped to this one icon; nothing else on the shell
+        // is tinted, unlike the mod it replaces.
+        //
+        // `brightness: 0.0` leaves the artwork's own luminance intact so the
+        // glyph keeps its shading; `colorization` then replaces its hue with
+        // exactly `tintColor`, landing on a precise theme role that a palette
+        // blend cannot target. Do not pass the Image straight to a MultiEffect:
+        // it needs a texture source and would render nothing, leaving the raw
+        // white SVG showing through.
+        ShaderEffectSource {
+            id: iconTexture
             sourceItem: icon
-            // monochrome keeps the icon's own shading while colourising it in
-            // one flat hue, so the glyph lands on an exact theme role instead
-            // of the palette blend, which cannot target a specific role.
-            active: true
-            monochrome: true
-            tintColor: wrapper.tintColor
+            hideSource: true
+            // The artwork never changes at runtime, so the texture is uploaded
+            // once and refreshed only when the source itself reports a change.
+            live: false
+        }
+
+        Connections {
+            target: icon
+            function onSourceChanged() { iconTexture.scheduleUpdate(); }
+            function onStatusChanged() { iconTexture.scheduleUpdate(); }
+        }
+
+        MultiEffect {
+            anchors.fill: icon
+            source: iconTexture
+            brightness: 0.0
+            colorization: 1.0
+            colorizationColor: wrapper.tintColor
         }
     }
 
