@@ -193,6 +193,21 @@ Item {
             function onStatusChanged() { iconTexture.scheduleUpdate(); }
         }
 
+        // `hideSource: true` above means the artwork is not drawn on its own,
+        // so this pass is the only thing that paints the glyph. With
+        // `live: false` the texture is captured once, and in the popup that
+        // capture happens while the PanelWindow is still hidden, leaving an
+        // empty texture that nothing ever refreshes -- the header icon simply
+        // renders as nothing. Re-capture whenever the wrapper becomes visible
+        // or is resized by its layout, which is what the popup's header row
+        // does when the window opens.
+        Connections {
+            target: wrapper
+            function onVisibleChanged() { if (wrapper.visible) iconTexture.scheduleUpdate(); }
+            function onWidthChanged() { iconTexture.scheduleUpdate(); }
+            function onHeightChanged() { iconTexture.scheduleUpdate(); }
+        }
+
         MultiEffect {
             anchors.fill: icon
             source: iconTexture
